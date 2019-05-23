@@ -43,9 +43,9 @@ const (
 )
 
 const (
-	DefaultStoreTimeout         = 5 * time.Second
-	DefaultProxyCheckInterval   = 5 * time.Second
-	DefaultProxyTimeoutInterval = 15 * time.Second
+	DefaultStoreTimeout         = 3 * time.Second
+	DefaultProxyCheckInterval   = 3 * time.Second
+	DefaultProxyTimeoutInterval = 20 * time.Second
 
 	DefaultDBWaitReadyTimeout = 60 * time.Second
 
