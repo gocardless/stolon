@@ -15,9 +15,16 @@
 package main
 
 import (
+	"os"
+
+	"github.com/coreos/etcd/clientv3"
 	"github.com/sorintlab/stolon/cmd/proxy/cmd"
+	"google.golang.org/grpc/grpclog"
 )
 
 func main() {
+	clientv3.SetLogger(
+		grpclog.NewLoggerV2WithVerbosity(os.Stderr, os.Stderr, os.Stderr, 0),
+	)
 	cmd.Execute()
 }
