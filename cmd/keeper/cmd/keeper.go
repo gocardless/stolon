@@ -116,6 +116,7 @@ type config struct {
 	pgSUPasswordFile        string
 	pgInitialSUUsername     string
 	pgInitialSUPasswordFile string
+	replica                 bool
 }
 
 var cfg config
@@ -145,6 +146,7 @@ func init() {
 	CmdKeeper.PersistentFlags().StringVar(&cfg.pgSUUsername, "pg-su-username", user, "postgres superuser user name. Used for keeper managed instance access and pg_rewind based synchronization. It'll be created on db initialization. Defaults to the name of the effective user running stolon-keeper. Must be the same for all keepers.")
 	CmdKeeper.PersistentFlags().StringVar(&cfg.pgSUPassword, "pg-su-password", "", "postgres superuser password. Only one of --pg-su-password or --pg-su-passwordfile must be provided. Must be the same for all keepers.")
 	CmdKeeper.PersistentFlags().StringVar(&cfg.pgSUPasswordFile, "pg-su-passwordfile", "", "postgres superuser password file. Only one of --pg-su-password or --pg-su-passwordfile must be provided. Must be the same for all keepers)")
+	CmdKeeper.PersistentFlags().BoolVar(&cfg.replica, "replica", false, "replica only keeper")
 	CmdKeeper.PersistentFlags().BoolVar(&cfg.debug, "debug", false, "enable debug logging")
 
 	CmdKeeper.PersistentFlags().MarkDeprecated("id", "please use --uid")
@@ -443,6 +445,8 @@ type PostgresKeeper struct {
 	pgSUPassword        string
 	pgInitialSUUsername string
 
+	replica bool
+
 	sleepInterval  time.Duration
 	requestTimeout time.Duration
 
@@ -493,6 +497,8 @@ func NewPostgresKeeper(cfg *config, end chan error) (*PostgresKeeper, error) {
 		pgSUUsername:        cfg.pgSUUsername,
 		pgSUPassword:        cfg.pgSUPassword,
 		pgInitialSUUsername: cfg.pgInitialSUUsername,
+
+		replica: cfg.replica,
 
 		sleepInterval:  cluster.DefaultSleepInterval,
 		requestTimeout: cluster.DefaultRequestTimeout,
@@ -567,6 +573,7 @@ func (p *PostgresKeeper) updateKeeperInfo() error {
 			Min: min,
 		},
 		PostgresState: p.getLastPGState(),
+		Replica:       p.replica,
 	}
 
 	// The time to live is just to automatically remove old entries, it's

@@ -50,6 +50,8 @@ type KeeperInfo struct {
 	PostgresBinaryVersion PostgresBinaryVersion `json:"postgresBinaryVersion,omitempty"`
 
 	PostgresState *PostgresState `json:"postgresState,omitempty"`
+
+	Replica bool `json:"replica,omitempty"`
 }
 
 func (k *KeeperInfo) DeepCopy() *KeeperInfo {

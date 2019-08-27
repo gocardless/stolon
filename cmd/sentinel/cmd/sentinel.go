@@ -369,7 +369,10 @@ func (s *Sentinel) findInitialKeeper(cd *cluster.ClusterData) (*cluster.Keeper, 
 	}
 	r := s.RandFn(len(cd.Keepers))
 	keys := []string{}
-	for k, _ := range cd.Keepers {
+	for k, keeper := range cd.Keepers {
+		if keeper.Spec.Replica {
+			continue
+		}
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -704,6 +707,9 @@ func (s *Sentinel) findBestStandbys(cd *cluster.ClusterData, masterDB *cluster.D
 	goodStandbys, _, _ := s.validStandbysByStatus(cd)
 	bestDBs := []*cluster.DB{}
 	for _, db := range goodStandbys {
+		if db.Spec.Replica {
+			continue
+		}
 		if db.Status.TimelineID != masterDB.Status.TimelineID {
 			log.Debugw("ignoring keeper since its pg timeline is different than master timeline", "db", db.UID, "dbTimeline", db.Status.TimelineID, "masterTimeline", masterDB.Status.TimelineID)
 			continue
@@ -1473,10 +1479,19 @@ func (s *Sentinel) updateCluster(cd *cluster.ClusterData, pis cluster.ProxiesInf
 								Role:         common.RoleStandby,
 								Followers:    []string{},
 								FollowConfig: &cluster.FollowConfig{Type: cluster.FollowTypeInternal, DBUID: wantedMasterDBUID},
+								Replica:      freeKeeper.Spec.Replica,
 							},
 						}
 						newcd.DBs[db.UID] = db
-						log.Infow("added new standby db", "db", db.UID, "keeper", db.Spec.KeeperUID)
+
+						var keeperType string
+						if db.Spec.Replica {
+							keeperType = "replica"
+						} else {
+							keeperType = "standby"
+						}
+						msg := fmt.Sprintf("added a new %s db", keeperType)
+						log.Infow(msg, "db", db.UID, "keeper", db.Spec.KeeperUID)
 					}
 				}
 			}

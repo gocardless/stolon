@@ -549,7 +549,9 @@ func NewCluster(uid string, cs *ClusterSpec) *Cluster {
 	return c
 }
 
-type KeeperSpec struct{}
+type KeeperSpec struct {
+	Replica bool `json:"replica,omitempty"`
+}
 
 type KeeperStatus struct {
 	Healthy         bool      `json:"healthy,omitempty"`
@@ -578,7 +580,9 @@ func NewKeeperFromKeeperInfo(ki *KeeperInfo) *Keeper {
 		UID:        ki.UID,
 		Generation: InitialGeneration,
 		ChangeTime: time.Time{},
-		Spec:       &KeeperSpec{},
+		Spec: &KeeperSpec{
+			Replica: ki.Replica,
+		},
 		Status: KeeperStatus{
 			Healthy:         true,
 			LastHealthyTime: time.Now(),
@@ -637,6 +641,8 @@ type DBSpec struct {
 	SynchronousStandbys []string `json:"synchronousStandbys"`
 	// External SynchronousStandbys are external standbys names to be configured as synchronous
 	ExternalSynchronousStandbys []string `json:"externalSynchronousStandbys"`
+	// Replica only
+	Replica bool `json:"replica,omitempty"`
 }
 
 type DBStatus struct {

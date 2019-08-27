@@ -350,6 +350,8 @@ func getKeeperRoles(dbuid string, cd *cluster.ClusterData) map[string]string {
 			keeperRoles[dbuid] = "sync"
 		} else if isExternalSynchronousStandby(parentDbuid, dbuid, cd) {
 			keeperRoles[dbuid] = "external sync"
+		} else if cd.DBs[dbuid].Spec.Replica {
+			keeperRoles[dbuid] = "async replica"
 		} else {
 			keeperRoles[dbuid] = "async"
 		}
