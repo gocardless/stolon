@@ -254,6 +254,7 @@ func (p *Process) start() error {
 		scanner := bufio.NewScanner(pr)
 		for scanner.Scan() {
 			p.t.Logf("[%s %s]: %s", p.name, p.uid, scanner.Text())
+			fmt.Printf("[%s %s]: %s\n", p.name, p.uid, scanner.Text())
 		}
 	}()
 

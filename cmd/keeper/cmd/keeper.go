@@ -876,14 +876,13 @@ func (p *PostgresKeeper) Start(ctx context.Context) {
 			smTimerCh = time.NewTimer(p.sleepInterval).C
 
 		case <-updatePGStateTimerCh:
-			// updateKeeperInfo two times faster than the sleep interval
 			go func() {
 				p.updatePGState(ctx)
 				endPgStatecheckerCh <- struct{}{}
 			}()
 
 		case <-endPgStatecheckerCh:
-			// updateKeeperInfo two times faster than the sleep interval
+			// updatePGState two times faster than the sleep interval
 			updatePGStateTimerCh = time.NewTimer(p.sleepInterval / 2).C
 
 		case <-updateKeeperInfoTimerCh:
@@ -1355,7 +1354,7 @@ func (p *PostgresKeeper) postgresKeeperSM(pctx context.Context) {
 				return
 			}
 
-			// create postgres parameteres with empty InitPGParameters
+			// create postgres parameters with empty InitPGParameters
 			pgParameters = p.createPGParameters(db)
 			// update pgm postgres parameters
 			pgm.SetParameters(pgParameters)
@@ -1378,18 +1377,25 @@ func (p *PostgresKeeper) postgresKeeperSM(pctx context.Context) {
 				return
 			}
 
+			tryArchiveRecovery := true
 			tryPgrewind := true
+
 			if !initialized {
 				tryPgrewind = false
+				tryArchiveRecovery = false
 			}
 			if systemID != followedDB.Status.SystemID {
+				log.Warn("system ID is different to that of the followed db. Forcing a full resync")
 				tryPgrewind = false
+				tryArchiveRecovery = false
 			}
 
 			masterDB, ok := cd.DBs[cd.Cluster.Status.Master]
 			if tryPgrewind && !ok {
 				log.Warn("no current master, disabling pg_rewind for this resync")
 				tryPgrewind = false
+				// TODO: should we disable?
+				// tryArchiveRecovery = false
 			}
 
 			// TODO(sgotti) pg_rewind considers databases on the same timeline
@@ -1408,7 +1414,7 @@ func (p *PostgresKeeper) postgresKeeperSM(pctx context.Context) {
 
 			// start and stop the instance to do crash recovery or pg_rewind
 			// will not work. Ignore possible errors.
-			if tryPgrewind {
+			if tryPgrewind && !tryArchiveRecovery {
 				if err = pgm.Start(); err != nil {
 					log.Error("err", zap.Error(err))
 				}
@@ -1417,20 +1423,28 @@ func (p *PostgresKeeper) postgresKeeperSM(pctx context.Context) {
 				}
 			}
 
-			if err = p.resync(db, masterDB, followedDB, tryPgrewind); err != nil {
-				log.Errorw("failed to resync from followed instance", zap.Error(err))
-				return
+			if tryArchiveRecovery {
+				log.Infow("attempting archive recovery")
+			} else {
+				if err = p.resync(db, masterDB, followedDB, tryPgrewind); err != nil {
+					log.Errorw("failed to resync from followed instance", zap.Error(err))
+					return
+				}
 			}
+
 			if err = pgm.Start(); err != nil {
 				log.Errorw("failed to start instance", zap.Error(err))
 				return
 			}
 
-			if tryPgrewind {
+			// TODO: Here add a check that xlog is increasing?
+
+			if tryPgrewind || tryArchiveRecovery {
 				fullResync := false
 				// if not accepting connection assume that it's blocked waiting for missing wal
 				// (see above TODO), so do a full resync using pg_basebackup.
 				if err = pgm.WaitReady(cd.Cluster.DefSpec().DBWaitReadyTimeout.Duration); err != nil {
+					// TODO: update message
 					log.Errorw("pg_rewinded standby is not accepting connection. it's probably waiting for unavailable wals. Forcing a full resync")
 					fullResync = true
 				} else {
@@ -1442,6 +1456,7 @@ func (p *PostgresKeeper) postgresKeeperSM(pctx context.Context) {
 						return
 					}
 					if p.isDifferentTimelineBranch(followedDB, pgState) {
+						log.Warn("forcing a full resync due to db on a different timeline branch")
 						fullResync = true
 					}
 				}
