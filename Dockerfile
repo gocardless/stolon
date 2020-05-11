@@ -19,7 +19,7 @@ RUN set -x \
 # release
 ################################################################################
 
-FROM ubuntu:18.04 AS release
+FROM ubuntu:20.04 AS release
 RUN set -x \
       && apt-get update -y \
       && apt-get install -y curl gpg \
